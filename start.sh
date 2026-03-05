@@ -1,10 +1,6 @@
 #!/bin/bash
-echo "==> Starting Text Leech Bot..."
-
-# Web server background mein (port ke liye zaruri)
-gunicorn app:app --bind 0.0.0.0:${PORT:-8080} --workers 1 &
-
-echo "==> Web server started on port ${PORT:-8080}"
-
-# Bot start karo
+echo "==> Starting..."
+export PYTHONPATH="/opt/render/project/src/modules:$PYTHONPATH"
+gunicorn app:app --bind 0.0.0.0:${PORT:-10000} --workers 1 &
+echo "==> Web server started"
 python3 modules/main.py
