@@ -1,10 +1,12 @@
-# @SudoR2spr
-import time
-import math
-import asyncio
 import os
+import sys
+import time
+import asyncio
+from datetime import timedelta
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from pyrogram.errors import FloodWait
-from datetime import datetime, timedelta
 
 
 class Timer:
@@ -20,7 +22,6 @@ class Timer:
 
 
 def hrb(value, digits=2, delim="", postfix=""):
-    """Return a human-readable file size."""
     if value is None:
         return None
     chosen_unit = "B"
@@ -30,75 +31,52 @@ def hrb(value, digits=2, delim="", postfix=""):
             chosen_unit = unit
         else:
             break
-    return f"{value:.{digits}f}" + delim + chosen_unit + postfix
+    return f"{value:.{digits}f}{delim}{chosen_unit}{postfix}"
 
 
 def hrt(seconds, precision=0):
-    """Return a human-readable time delta as a string."""
     pieces = []
     value = timedelta(seconds=seconds)
-
     if value.days:
         pieces.append(f"{value.days}d")
-
-    seconds = value.seconds
-
-    if seconds >= 3600:
-        hours = int(seconds / 3600)
-        pieces.append(f"{hours}h")
-        seconds -= hours * 3600
-
-    if seconds >= 60:
-        minutes = int(seconds / 60)
-        pieces.append(f"{minutes}m")
-        seconds -= minutes * 60
-
-    if seconds > 0 or not pieces:
-        pieces.append(f"{seconds}s")
-
-    if not precision:
-        return "".join(pieces)
-
-    return "".join(pieces[:precision])
+    secs = value.seconds
+    if secs >= 3600:
+        h = int(secs / 3600)
+        pieces.append(f"{h}h")
+        secs -= h * 3600
+    if secs >= 60:
+        m = int(secs / 60)
+        pieces.append(f"{m}m")
+        secs -= m * 60
+    if secs > 0 or not pieces:
+        pieces.append(f"{secs}s")
+    return "".join(pieces[:precision] if precision else pieces)
 
 
 timer = Timer()
 
 
 async def progress_bar(current, total, reply, start):
-    if timer.can_send():
-        now = time.time()
-        diff = now - start
-        if diff < 1:
-            return
-        perc = f"{current * 100 / total:.1f}%"
-        elapsed_time = round(diff)
-        speed = current / elapsed_time
-        remaining_bytes = total - current
-        if speed > 0:
-            eta_seconds = remaining_bytes / speed
-            eta = hrt(eta_seconds, precision=1)
-        else:
-            eta = "-"
-        sp = str(hrb(speed)) + "/s"
-        tot = hrb(total)
-        cur = hrb(current)
-        bar_length = 11
-        completed_length = int(current * bar_length / total)
-        remaining_length = bar_length - completed_length
-        bar = "◆" * completed_length + "◇" * remaining_length
-
-        try:
-            await reply.edit(
-                f'<b>\n ╭─⌯══⟰ 𝐔𝐩𝐥𝐨𝐝𝐢𝐧𝐠 ⟰══⌯──★ \n'
-                f'├⚡ {bar}|﹝{perc}﹞ \n'
-                f'├🚀 Speed » {sp} \n'
-                f'├📟 Processed » {cur}\n'
-                f'├🧲 Size - ETA » {tot} - {eta} \n'
-                f'├𝐁𝐲 » 𝐖𝐃 𝐙𝐎𝐍𝐄\n'
-                f'╰─══ ✪ @Opleech_WD ✪ ══─★\n</b>'
-            )
-        except FloodWait as e:
-            # BUG FIX: async function mein time.sleep() use nahi hona chahiye → event loop block hota tha
-            # e.x bhi purana pyrogram ka tha, ab e.value hai
-            await asyncio.sleep(e.value)
+    if not timer.can_send():
+        return
+    diff = time.time() - start
+    if diff < 1:
+        return
+    speed = current / diff
+    eta = hrt(((total - current) / speed) if speed > 0 else 0, precision=1)
+    done = int(current * 11 / total)
+    bar = "◆" * done + "◇" * (11 - done)
+    try:
+        await reply.edit(
+            f"<b>\n"
+            f" ╭─⌯══⟰ 𝐔𝐩𝐥𝐨𝐚𝐝𝐢𝐧𝐠 ⟰══⌯──★\n"
+            f"├⚡ {bar} ﹝{current * 100 / total:.1f}%﹞\n"
+            f"├🚀 Speed » {hrb(speed)}/s\n"
+            f"├📟 Done » {hrb(current)} / {hrb(total)}\n"
+            f"├⏱ ETA » {eta}\n"
+            f"╰─══ ✪ @Opleech_WD ✪ ══─★\n</b>"
+        )
+    except FloodWait as e:
+        await asyncio.sleep(e.value)
+    except Exception:
+        pass
