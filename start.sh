@@ -13,6 +13,6 @@ echo "API_HASH set: $([ -n "$API_HASH" ] && echo YES || echo NO)"
 echo "BOT_TOKEN set: $([ -n "$BOT_TOKEN" ] && echo YES || echo NO)"
 
 echo "==> Starting bot now..."
-python3 -u modules/main.py
+python3 -u modules/main.py 2>&1
 EXIT_CODE=$?
 echo "==> Bot exited with code: $EXIT_CODE"
