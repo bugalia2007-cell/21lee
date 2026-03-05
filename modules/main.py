@@ -1,216 +1,99 @@
 import os
 import sys
+import time
+import asyncio
+import logging
+import requests
+import subprocess
+import concurrent.futures
+
+import aiohttp
+import aiofiles
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import re
-import time
-import asyncio
-import requests
-import subprocess
-
-import core as helper
-from vars import API_ID, API_HASH, BOT_TOKEN, WEBHOOK, PORT
+from pyrogram import Client
+from pyrogram.types import Message
 from utils import progress_bar
-from aiohttp import ClientSession
-from subprocess import getstatusoutput
 
-from pyrogram import Client, filters
-from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
-from pyrogram.errors import FloodWait
-from pyromod import listen
-
-bot = Client(
-    "bot",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    bot_token=BOT_TOKEN
-)
+failed_counter = 0
 
 
-@bot.on_message(filters.command(["start"]))
-async def start_handler(bot: Client, m: Message):
-    await m.reply_text(
-        "**𝐇𝐞𝐥𝐥𝐨 ❤️**\n\n"
-        "◆〓◆ ❖ 𝐖𝐃 𝐙𝐎𝐍𝐄 ❖ ™ ◆〓◆\n\n"
-        "❈ Main ek bot hoon jo tumhari **.TXT** file ke links\n"
-        "download karke Telegram pe upload karta hoon!\n\n"
-        "📌 **Shuru karne ke liye:** /upload bhejo",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("✜ Join Channel ✜", url="https://t.me/Opleech_WD")],
-        ])
+def duration(filename):
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "default=noprint_wrappers=1:nokey=1", filename],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT
     )
-
-
-@bot.on_message(filters.command(["stop"]))
-async def stop_handler(_, m: Message):
-    await m.reply_text("♦ Stopped ♦")
-    os.execl(sys.executable, sys.executable, *sys.argv)
-
-
-@bot.on_message(filters.command(["upload"]))
-async def upload_handler(bot: Client, m: Message):
-    editable = await m.reply_text("📂 **Apni .TXT file bhejo**")
-    input_msg = await bot.listen(editable.chat.id)
-    x = await input_msg.download()
-    await input_msg.delete(True)
-
     try:
-        with open(x, "r", encoding="utf-8", errors="ignore") as f:
-            content = f.read()
-        links = []
-        for line in content.split("\n"):
-            line = line.strip()
-            if line and "://" in line:
-                parts = line.split("://", 1)
-                if len(parts) == 2:
-                    links.append(parts)
-        os.remove(x)
-    except Exception as e:
-        await editable.edit(f"❌ Error: `{str(e)}`")
-        if os.path.exists(x):
-            os.remove(x)
-        return
+        return float(result.stdout)
+    except Exception:
+        return 0
 
-    if not links:
-        await editable.edit("❌ Koi valid link nahi mila!\nFormat: `Name://https://link`")
-        return
 
-    await editable.edit(f"✅ **{len(links)} links mile!**\n\nKis number se start karein? (default: 1)")
-    input0 = await bot.listen(editable.chat.id)
+async def download_pdf(url, name):
+    filename = f"{name}.pdf"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            if resp.status == 200:
+                async with aiofiles.open(filename, mode='wb') as f:
+                    await f.write(await resp.read())
+    return filename
+
+
+async def download_video(url, cmd, name):
+    global failed_counter
+    download_cmd = (
+        f'{cmd} -R 25 --fragment-retries 25 '
+        f'--external-downloader aria2c '
+        f'--downloader-args "aria2c: -x 16 -j 32"'
+    )
+    print(f"[CMD] {download_cmd}")
+    k = subprocess.run(download_cmd, shell=True)
+    if "visionias" in cmd and k.returncode != 0 and failed_counter <= 10:
+        failed_counter += 1
+        await asyncio.sleep(5)
+        return await download_video(url, cmd, name)
+    failed_counter = 0
+    for ext in ["", ".webm", ".mp4", ".mkv"]:
+        check = name if not ext else (os.path.splitext(name)[0] + ext)
+        if os.path.isfile(check):
+            return check
+    return os.path.splitext(name)[0] + ".mp4"
+
+
+async def send_vid(bot: Client, m: Message, cc, filename, thumb, name, prog):
+    thumb_file = f"{filename}.jpg"
+    subprocess.run(
+        f'ffmpeg -i "{filename}" -ss 00:00:12 -vframes 1 "{thumb_file}" -y',
+        shell=True, stderr=subprocess.DEVNULL
+    )
     try:
-        start_from = max(1, int(input0.text.strip()))
-    except:
-        start_from = 1
-    await input0.delete(True)
-
-    await editable.edit("✏️ **Batch ka naam bhejo:**")
-    input1 = await bot.listen(editable.chat.id)
-    batch_name = input1.text.strip()
-    await input1.delete(True)
-
-    await editable.edit("🎬 **Quality:** 144 | 240 | 360 | 480 | 720 | 1080")
-    input2 = await bot.listen(editable.chat.id)
-    quality = input2.text.strip()
-    await input2.delete(True)
-    if quality not in ["144", "240", "360", "480", "720", "1080"]:
-        quality = "720"
-
-    await editable.edit("📝 **Caption bhejo:**")
-    input3 = await bot.listen(editable.chat.id)
-    caption_text = input3.text.strip()
-    await input3.delete(True)
-
-    await editable.edit("🖼️ **Thumbnail URL** (ya **no**):")
-    input6 = await bot.listen(editable.chat.id)
-    thumb_input = input6.text.strip() if input6.text else "no"
-    await input6.delete(True)
-    await editable.delete()
-
-    thumb = "no"
-    if thumb_input.startswith("http://") or thumb_input.startswith("https://"):
-        try:
-            getstatusoutput(f"wget '{thumb_input}' -O 'thumb.jpg'")
-            if os.path.exists("thumb.jpg"):
-                thumb = "thumb.jpg"
-        except:
-            pass
-
-    count = start_from
-    total = len(links)
-
-    for i in range(start_from - 1, total):
-        if len(links[i]) < 2:
-            count += 1
-            continue
-
-        name1 = (links[i][0]
-                 .replace("\t", "").replace(":", "").replace("/", "")
-                 .replace("+", "").replace("#", "").replace("|", "")
-                 .replace("@", "").replace("*", "").replace(".", "")
-                 .replace("https", "").replace("http", "").strip())
-        name = f"{str(count).zfill(3)}) {name1[:55]}"
-        url = "https://" + (links[i][1].strip()
-                            .replace("file/d/", "uc?export=download&id=")
-                            .replace("www.youtube-nocookie.com/embed", "youtu.be")
-                            .replace("?modestbranding=1", "")
-                            .replace("/view?usp=sharing", ""))
-
-        cc  = f"**[ 🎥 ] {str(count).zfill(3)}. {name1}**\n{caption_text}\n✉️ Batch » **{batch_name}**"
-        cc1 = f"**[ 📁 ] {str(count).zfill(3)}. {name1}**\n{caption_text}\n✉️ Batch » **{batch_name}**"
-
-        try:
-            if "visionias" in url:
-                async with ClientSession() as session:
-                    async with session.get(url, headers={
-                        'User-Agent': 'Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36',
-                        'Referer': 'http://www.visionias.in/',
-                    }) as resp:
-                        text = await resp.text()
-                        match = re.search(r"(https://.*?playlist.m3u8.*?)\"", text)
-                        if match:
-                            url = match.group(1)
-                        else:
-                            await m.reply_text(f"⚠️ VisionIAS fail: `{name}`")
-                            count += 1
-                            continue
-
-            elif "/master.mpd" in url:
-                id_ = url.split("/")[-2]
-                url = f"https://d26g5bnklkwsh4.cloudfront.net/{id_}/master.m3u8"
-
-            if "drive.google" in url:
-                ka = await helper.download_pdf(url, name)
-                await bot.send_document(chat_id=m.chat.id, document=ka, caption=cc1)
-                count += 1
-                if os.path.exists(ka):
-                    os.remove(ka)
-                await asyncio.sleep(1)
-
-            elif ".pdf" in url.lower():
-                os.system(f'yt-dlp -o "{name}.pdf" "{url}" -R 25')
-                if os.path.exists(f"{name}.pdf"):
-                    await bot.send_document(chat_id=m.chat.id, document=f"{name}.pdf", caption=cc1)
-                    os.remove(f"{name}.pdf")
-                count += 1
-
-            else:
-                ytf = (f"b[height<={quality}][ext=mp4]/bv[height<={quality}][ext=mp4]+ba[ext=m4a]/b[ext=mp4]"
-                       if "youtu" in url else
-                       f"b[height<={quality}]/bv[height<={quality}]+ba/b/bv+ba")
-                cmd = (f'yt-dlp -o "{name}.mp4" "{url}"' if "jw-prod" in url
-                       else f'yt-dlp -f "{ytf}" "{url}" -o "{name}.mp4"')
-
-                prog = await m.reply_text(
-                    f"⬇️ **Downloading...**\n\n"
-                    f"📝 `{name}`\n🎬 {quality}p | 🔢 {count}/{total}")
-                res_file = await helper.download_video(url, cmd, name)
-                await helper.send_vid(bot, m, cc, res_file, thumb, name, prog)
-                count += 1
-                await asyncio.sleep(1)
-
-        except FloodWait as e:
-            await asyncio.sleep(e.value)
-            continue
-        except Exception as e:
-            await m.reply_text(f"❌ `{str(e)}`\n📝 `{name}`")
-            count += 1
-            continue
-
-    if thumb != "no" and os.path.exists("thumb.jpg"):
-        os.remove("thumb.jpg")
-
-    await m.reply_text(f"✅ **Done!**\n📦 {batch_name} | 🔢 {total} files")
-
-
-async def main():
-    await bot.start()
-    print("✅ Bot Running!")
+        await prog.delete(True)
+    except Exception:
+        pass
+    reply = await m.reply_text(f"**⥣ Uploading...** » `{name}`")
+    thumbnail = (thumb if thumb and thumb != "no" and os.path.exists(thumb)
+                 else thumb_file if os.path.exists(thumb_file) else None)
+    dur = int(duration(filename))
+    start_time = time.time()
     try:
-        await asyncio.Event().wait()
-    except (KeyboardInterrupt, SystemExit):
-        await bot.stop()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+        await m.reply_video(
+            filename, caption=cc,
+            supports_streaming=True,
+            height=720, width=1280,
+            thumb=thumbnail, duration=dur,
+            progress=progress_bar,
+            progress_args=(reply, start_time)
+        )
+    except Exception:
+        await m.reply_document(
+            filename, caption=cc,
+            progress=progress_bar,
+            progress_args=(reply, start_time)
+        )
+    if os.path.exists(filename):
+        os.remove(filename)
+    if os.path.exists(thumb_file):
+        os.remove(thumb_file)
+    await reply.delete(True)
