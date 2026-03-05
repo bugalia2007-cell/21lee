@@ -1,11 +1,9 @@
 services:
   - type: web
     name: text-leech-bot
-    env: python
+    env: docker
     plan: free
-    pythonVersion: "3.10.13"
-    buildCommand: pip install -r requirements.txt
-    startCommand: bash start.sh
+    dockerfilePath: ./Dockerfile
     envVars:
       - key: API_ID
         sync: false
