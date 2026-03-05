@@ -21,7 +21,6 @@ from subprocess import getstatusoutput
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram.errors import FloodWait
-from pyromod import listen
 
 bot = Client(
     "/tmp/bot/bot",
