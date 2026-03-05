@@ -1,34 +1,47 @@
 from flask import Flask
 import os
-import threading
-import time
-import requests
 
 app = Flask(__name__)
 
-@app.route("/")
-def index():
-    return "<h2>✅ Text Leech Bot is Running!</h2><p>Bot is alive and working.</p>", 200
+@app.route("/", methods=["GET", "HEAD"])
+def hello_world():
+    return """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" type="text/css" href="https://sudor2spr.github.io/Documentation/assets/style.css">
+    <title>SudoR2spr Repository</title>
+    <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/SudoR2spr/SudoR2spr/main/assets/angel-op/Angel-ji.png">
+</head>
+<body>
+    <div class="container" style="bg-dark text-red text-center py-3 mt-5">
+        <a href="https://telegram.me/Opleech_WD" class="card">
+            <p>
+               ░█▀▀▄░▒█▄░▒█░▒█▀▀█░▒█▀▀▀░▒█░░░<br>
+               ▒█▄▄█░▒█▒█▒█░▒█░▄▄░▒█▀▀▀░▒█░░░<br>
+               ▒█░▒█░▒█░░▀█░▒█▄▄▀░▒█▄▄▄░▒█▄▄█<br>
+               <br>
+               <b>v3.0.0 - Fixed & Working</b>
+            </p>
+        </a>
+    </div>
+    <br/><br/><br/>
+    <footer class="bg-dark text-white text-center py-3 mt-5">
+        <center>
+            <img loading="lazy" src="https://graph.org/file/548b8b73c35af202bfdac.png" width="60" height="60">
+            Powered By 𝐖𝐎𝐎𝐃𝐜𝐫𝐚𝐟𝐭
+            <img loading="lazy" src="https://graph.org/file/548b8b73c35af202bfdac.png" width="60" height="60">
+            <div><p>© 2024 Text Leech Bot. All rights reserved.</p></div>
+        </center>
+    </footer>
+</body>
+</html>"""
 
 @app.route("/health")
 def health():
-    return {"status": "ok"}, 200
-
-def keep_alive():
-    """Render free tier pe bot ko jaagne rakhne ke liye har 5 min ping karta hai"""
-    time.sleep(30)  # startup ke baad wait karo
-    url = os.environ.get("RENDER_EXTERNAL_URL", "https://two1lee.onrender.com")
-    while True:
-        try:
-            requests.get(f"{url}/health", timeout=10)
-            print("==> Keep-alive ping sent ✅")
-        except Exception as e:
-            print(f"==> Keep-alive ping failed: {e}")
-        time.sleep(300)  # har 5 minute
-
-# Keep-alive thread start karo
-threading.Thread(target=keep_alive, daemon=True).start()
+    return "OK", 200
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
