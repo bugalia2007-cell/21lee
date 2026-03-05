@@ -22,6 +22,7 @@ class Timer:
 
 
 def hrb(value, digits=2, delim="", postfix=""):
+    """Human readable file size."""
     if value is None:
         return None
     chosen_unit = "B"
@@ -35,6 +36,7 @@ def hrb(value, digits=2, delim="", postfix=""):
 
 
 def hrt(seconds, precision=0):
+    """Human readable time delta."""
     pieces = []
     value = timedelta(seconds=seconds)
     if value.days:
@@ -50,7 +52,9 @@ def hrt(seconds, precision=0):
         secs -= m * 60
     if secs > 0 or not pieces:
         pieces.append(f"{secs}s")
-    return "".join(pieces[:precision] if precision else pieces)
+    if not precision:
+        return "".join(pieces)
+    return "".join(pieces[:precision])
 
 
 timer = Timer()
@@ -62,21 +66,27 @@ async def progress_bar(current, total, reply, start):
     diff = time.time() - start
     if diff < 1:
         return
-    speed = current / diff
-    eta = hrt(((total - current) / speed) if speed > 0 else 0, precision=1)
-    done = int(current * 11 / total)
-    bar = "◆" * done + "◇" * (11 - done)
+    perc     = f"{current * 100 / total:.1f}%"
+    speed    = current / diff
+    eta      = hrt(((total - current) / speed) if speed > 0 else 0, precision=1)
+    sp       = hrb(speed) + "/s"
+    tot      = hrb(total)
+    cur      = hrb(current)
+    bar_len  = 11
+    done     = int(current * bar_len / total)
+    bar      = "◆" * done + "◇" * (bar_len - done)
     try:
         await reply.edit(
             f"<b>\n"
             f" ╭─⌯══⟰ 𝐔𝐩𝐥𝐨𝐚𝐝𝐢𝐧𝐠 ⟰══⌯──★\n"
-            f"├⚡ {bar} ﹝{current * 100 / total:.1f}%﹞\n"
-            f"├🚀 Speed » {hrb(speed)}/s\n"
-            f"├📟 Done » {hrb(current)} / {hrb(total)}\n"
-            f"├⏱ ETA » {eta}\n"
+            f"├⚡ {bar} ﹝{perc}﹞\n"
+            f"├🚀 Speed » {sp}\n"
+            f"├📟 Done » {cur}\n"
+            f"├🧲 Size - ETA » {tot} - {eta}\n"
+            f"├𝐁𝐲 » 𝐖𝐃 𝐙𝐎𝐍𝐄\n"
             f"╰─══ ✪ @Opleech_WD ✪ ══─★\n</b>"
         )
     except FloodWait as e:
-        await asyncio.sleep(e.value)
+        await asyncio.sleep(e.value)   # ✅ Fixed: e.x → e.value, time.sleep → await asyncio.sleep
     except Exception:
         pass
